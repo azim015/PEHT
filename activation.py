@@ -11,6 +11,9 @@ from torch.nn.parameter import Parameter
 from linear import NonDynamicallyQuantizableLinear
 from module import Module
 
+import math
+import torch
+from torch import nn
 
 __all__ = [
     "Threshold",
@@ -45,6 +48,29 @@ __all__ = [
 ]
 
 
+class LoRALinearAdapter(nn.Module):
+    def __init__(self, in_features, out_features, r=0, alpha=1.0, dropout=0.0, device=None, dtype=None):
+        super().__init__()
+        self.r = r
+        self.alpha = alpha
+        self.scaling = alpha / r if r > 0 else 0.0
+        self.lora_dropout = nn.Dropout(dropout) if dropout > 0 else nn.Identity()
+
+        if r > 0:
+            self.A = nn.Parameter(torch.zeros(r, in_features, device=device, dtype=dtype))
+            self.B = nn.Parameter(torch.zeros(out_features, r, device=device, dtype=dtype))
+            nn.init.kaiming_uniform_(self.A, a=math.sqrt(5))
+            nn.init.zeros_(self.B)
+        else:
+            self.register_parameter("A", None)
+            self.register_parameter("B", None)
+
+    def forward(self, x):
+        if self.r <= 0:
+            return 0.0
+        x = self.lora_dropout(x)
+        return (x @ self.A.T @ self.B.T) * self.scaling
+        
 class Threshold(Module):
     r"""Thresholds each element of the input Tensor.
 

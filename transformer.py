@@ -116,6 +116,9 @@ class Transformer(Module):
         bias: bool = True,
         device=None,
         dtype=None,
+        
+
+        
     ) -> None:
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
@@ -733,6 +736,12 @@ class TransformerEncoderLayer(Module):
         bias: bool = True,
         device=None,
         dtype=None,
+        lora_r: int = 0,
+        lora_alpha: float = 1.0,
+        lora_dropout: float = 0.0,
+        lora_targets: tuple = ("q", "v"),
+        
+
     ) -> None:
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
@@ -741,7 +750,11 @@ class TransformerEncoderLayer(Module):
             nhead,
             dropout=dropout,
             bias=bias,
-            batch_first=batch_first,
+            batch_first=batch_first,          
+            lora_r=lora_r,
+            lora_alpha=lora_alpha,
+            lora_dropout=lora_dropout,
+            lora_targets=lora_targets,
             **factory_kwargs,
         )
         # Implementation of Feedforward model
