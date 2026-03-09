@@ -1081,6 +1081,10 @@ class MultiheadAttention(Module):
         batch_first=False,
         device=None,
         dtype=None,
+        lora_r=0,
+        lora_alpha=1.0,
+        lora_dropout=0.0,
+        lora_targets=("q", "v"),
     ) -> None:
         if embed_dim <= 0 or num_heads <= 0:
             raise ValueError(
@@ -1098,6 +1102,12 @@ class MultiheadAttention(Module):
         self.dropout = dropout
         self.batch_first = batch_first
         self.head_dim = embed_dim // num_heads
+        
+        self.lora_q = LoRALinearAdapter(embed_dim, embed_dim, lora_r, lora_alpha, lora_dropout, device=device, dtype=dtype) if "q" in lora_targets else None
+        self.lora_k = LoRALinearAdapter(embed_dim, embed_dim, lora_r, lora_alpha, lora_dropout, device=device, dtype=dtype) if "k" in lora_targets else None
+        self.lora_v = LoRALinearAdapter(embed_dim, embed_dim, lora_r, lora_alpha, lora_dropout, device=device, dtype=dtype) if "v" in lora_targets else None
+        self.lora_o = LoRALinearAdapter(embed_dim, embed_dim, lora_r, lora_alpha, lora_dropout, device=device, dtype=dtype) if "o" in lora_targets else None
+
         assert (
             self.head_dim * num_heads == self.embed_dim
         ), "embed_dim must be divisible by num_heads"
@@ -1172,6 +1182,23 @@ class MultiheadAttention(Module):
         attn_mask: Optional[Tensor] = None,
         average_attn_weights: bool = True,
         is_causal: bool = False,
+        
+        q = linear(query, W_q, b_q)
+        if self.lora_q is not None:
+            q = q + self.lora_q(query)
+
+        k = linear(key, W_k, b_k)
+        if self.lora_k is not None:
+            k = k + self.lora_k(key)
+
+        v = linear(value, W_v, b_v)
+        if self.lora_v is not None:
+            v = v + self.lora_v(value)
+    
+        attn_output = linear(attn_output, W_o, b_o)
+        if self.lora_o is not None:
+            attn_output = attn_output + self.lora_o(attn_output_before_output_proj)
+    
     ) -> tuple[Tensor, Optional[Tensor]]:
         r"""Compute attention outputs using query, key, and value embeddings.
 
